@@ -2,7 +2,7 @@ name: Run Automation Tests
 
 on:
   workflow_dispatch:  
-  pull_request:       
+  pull_request:      
     branches: [ main, develop ]
 
 jobs:
@@ -19,16 +19,21 @@ jobs:
       with:
         java-version: '11'
         distribution: 'temurin'
-        cache: 'gradle'
         
-    - name: Make Gradle Wrapper Executable
-      run: chmod +x ./gradlew
+    - name: Grant execute permission for gradlew
+      run: chmod +x gradlew
+      
+    - name: Test Gradle Wrapper
+      run: ./gradlew --version
       
     - name: Run Web Tests
-      run: ./gradlew testWeb --no-daemon
+      run: ./gradlew testWeb --stacktrace --no-daemon
       
     - name: Run API Tests  
-      run: ./gradlew testApi --no-daemon
+      run: ./gradlew testApi --stacktrace --no-daemon
+      
+    - name: List build directory
+      run: ls -la build/
       
     - name: Upload Test Reports
       uses: actions/upload-artifact@v4
@@ -39,11 +44,3 @@ jobs:
           build/reports/
           build/test-results/
         retention-days: 7
-        
-    - name: Test Summary
-      if: always()
-      run: |
-        echo "## Test Execution Summary" >> $GITHUB_STEP_SUMMARY
-        echo " **Web Tests**: Completed" >> $GITHUB_STEP_SUMMARY
-        echo " **API Tests**: Completed" >> $GITHUB_STEP_SUMMARY
-        echo " **Reports available in Artifacts**" >> $GITHUB_STEP_SUMMARY
