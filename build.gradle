@@ -1,0 +1,239 @@
+plugins {
+    id 'java'
+    id 'idea'
+}
+
+group = 'pusingpala'
+version = '1.0-SNAPSHOT'
+
+java {
+    sourceCompatibility = JavaVersion.VERSION_11
+    targetCompatibility = JavaVersion.VERSION_11
+}
+
+repositories {
+    mavenCentral()
+}
+
+ext {
+    cucumberVersion = '7.15.0'
+    junitPlatformVersion = '1.10.0'
+    restAssuredVersion = '5.4.0'
+    seleniumVersion = '4.20.0'
+    webDriverManagerVersion = '5.9.2'
+    junitJupiterVersion = '5.10.0'
+
+    cucumberPlugins = 'pretty, html:build/reports/cucumber/index.html, json:build/reports/cucumber/cucumber.json, junit:build/reports/cucumber/junit.xml'
+}
+
+dependencies {
+    // Cucumber
+    testImplementation "io.cucumber:cucumber-java:${cucumberVersion}"
+    testImplementation "io.cucumber:cucumber-junit-platform-engine:${cucumberVersion}"
+
+    // JUnit
+    testImplementation "org.junit.platform:junit-platform-suite:${junitPlatformVersion}"
+    testImplementation "org.junit.jupiter:junit-jupiter:${junitJupiterVersion}"
+
+    // Selenium WebDriver
+    implementation "org.seleniumhq.selenium:selenium-java:${seleniumVersion}"
+    implementation "org.seleniumhq.selenium:selenium-chrome-driver:${seleniumVersion}"
+    implementation "org.seleniumhq.selenium:selenium-devtools-v85:${seleniumVersion}"
+
+    // REST API Testing
+    implementation "io.rest-assured:rest-assured:${restAssuredVersion}"
+    testImplementation "io.rest-assured:json-schema-validator:${restAssuredVersion}"
+
+    // WebDriver Management
+    implementation "io.github.bonigarcia:webdrivermanager:${webDriverManagerVersion}"
+
+    // Assertions
+    testImplementation "org.hamcrest:hamcrest:2.2"
+
+    // Logging (untuk menghilangkan warning SLF4J)
+    testImplementation "org.slf4j:slf4j-simple:2.0.9"
+}
+
+test {
+    useJUnitPlatform()
+    systemProperty "cucumber.plugin", project.ext.cucumberPlugins
+    systemProperty "cucumber.junit-platform.naming-strategy", "long"
+
+    testLogging {
+        events "passed", "skipped", "failed", "standard_out", "standard_error"
+        showExceptions = true
+        exceptionFormat = "full"
+        showCauses = true
+        showStackTraces = true
+    }
+
+    // Skip tests by default, run specific tasks instead
+    enabled = false
+}
+
+tasks.register('testAll', Test) {
+    group = 'verification'
+    description = 'Run all tests (web + api)'
+    useJUnitPlatform()
+    systemProperty "cucumber.plugin", project.ext.cucumberPlugins
+    systemProperty "cucumber.junit-platform.naming-strategy", "long"
+
+    testLogging {
+        events "passed", "skipped", "failed", "standard_out", "standard_error"
+        exceptionFormat = "full"
+    }
+}
+
+tasks.register('testApi', Test) {
+    group = 'verification'
+    description = 'Run cucumber tests tagged @api'
+    useJUnitPlatform()
+
+    systemProperty 'cucumber.filter.tags', '@api'
+    systemProperty 'cucumber.plugin', project.ext.cucumberPlugins
+    systemProperty 'cucumber.junit-platform.naming-strategy', 'long'
+    systemProperty 'cucumber.execution.parallel.enabled', 'false'
+
+    // DummyAPI configuration
+    systemProperty 'dummyapi.appid', '63a804408eb0cb069b57e43a'
+    systemProperty 'dummyapi.baseurl', 'https://dummyapi.io/data/v1'
+
+    testClassesDirs = sourceSets.test.output.classesDirs
+    classpath = sourceSets.test.runtimeClasspath
+
+    testLogging {
+        events "passed", "skipped", "failed", "standard_out", "standard_error"
+        exceptionFormat = "full"
+        showStandardStreams = true
+    }
+
+    // Include only API test classes
+    include '**/api/**'
+    include '**/ApiTestRunner*'
+    include '**/UserApiSteps*'
+}
+
+tasks.register('testWeb', Test) {
+    group = 'verification'
+    description = 'Run cucumber tests tagged @web'
+    useJUnitPlatform()
+
+    systemProperty 'cucumber.filter.tags', '@web'
+    systemProperty 'cucumber.plugin', project.ext.cucumberPlugins
+    systemProperty 'cucumber.junit-platform.naming-strategy', 'long'
+    systemProperty 'cucumber.execution.parallel.enabled', 'false'
+
+    // Selenium configuration
+    systemProperty 'webdriver.chrome.driver', ''
+    systemProperty 'webdriver.chrome.silentOutput', 'true'
+
+    testClassesDirs = sourceSets.test.output.classesDirs
+    classpath = sourceSets.test.runtimeClasspath
+
+    testLogging {
+        events "passed", "skipped", "failed", "standard_out", "standard_error"
+        exceptionFormat = "full"
+    }
+
+    // Include only Web test classes
+    include '**/web/**'
+    include '**/WebTest*'
+    include '**/WebSteps*'
+    include '**/HomePage*'
+    include '**/ProductPage*'
+}
+
+tasks.register('testSmoke', Test) {
+    group = 'verification'
+    description = 'Run smoke tests'
+    useJUnitPlatform()
+
+    systemProperty 'cucumber.filter.tags', '@smoke'
+    systemProperty 'cucumber.plugin', project.ext.cucumberPlugins
+    systemProperty 'cucumber.junit-platform.naming-strategy', 'long'
+
+    testClassesDirs = sourceSets.test.output.classesDirs
+    classpath = sourceSets.test.runtimeClasspath
+}
+
+tasks.register('cleanReports', Delete) {
+    group = 'build'
+    description = 'Clean test reports'
+    delete 'build/reports', 'build/test-results'
+}
+
+// Dependencies
+tasks.named('check') {
+    dependsOn tasks.named('testApi')
+    dependsOn tasks.named('testWeb')
+}
+
+tasks.named('testApi') {
+    dependsOn tasks.named('testClasses')
+}
+
+tasks.named('testWeb') {
+    dependsOn tasks.named('testClasses')
+}
+
+tasks.named('clean') {
+    dependsOn tasks.named('cleanReports')
+}
+
+// IDE Configuration
+idea {
+    module {
+        testSources.from(sourceSets.test.java.srcDirs)
+        downloadSources = true
+        downloadJavadoc = true
+    }
+}
+
+// Menghilangkan warning deprecated
+tasks.withType(JavaCompile) {
+    options.compilerArgs += ['-Xlint:-deprecation']
+    options.encoding = 'UTF-8'
+}
+
+tasks.withType(Test) {
+    // Always run tests even if up-to-date
+    outputs.upToDateWhen { false }
+
+    // Set timeouts
+    timeout = Duration.ofMinutes(10)
+
+    // Configure JVM args
+    jvmArgs += ['-Xmx512m', '-Dfile.encoding=UTF-8']
+
+    // Fail build if there are test failures
+    ignoreFailures = false
+}
+
+// Task untuk menampilkan informasi project
+tasks.register('projectInfo') {
+    group = 'help'
+    description = 'Display project information'
+    doLast {
+        println """
+        🚀 Project Information:
+        - Name: ${project.name}
+        - Version: ${project.version}
+        - Java Version: ${sourceCompatibility}
+        
+        📊 Available Test Tasks:
+        - testApi    : Run API tests only
+        - testWeb    : Run Web tests only  
+        - testAll    : Run all tests
+        - testSmoke  : Run smoke tests
+        
+        🔧 Usage:
+        ./gradlew testApi    # Run API tests
+        ./gradlew testWeb    # Run Web tests
+        ./gradlew clean testAll  # Clean and run all tests
+        
+        📁 Reports:
+        - Cucumber HTML: build/reports/cucumber/index.html
+        - Test Results: build/reports/tests/
+        """
+    }
+}
