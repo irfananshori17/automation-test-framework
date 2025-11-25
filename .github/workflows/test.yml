@@ -27,17 +27,17 @@ jobs:
     - name: Run API Tests
       run: ./gradlew testApi --no-daemon
       
-    - name: Upload API Test Reports
+    - name: Upload Test Reports
       uses: actions/upload-artifact@v4
       with:
-        name: api-test-reports
+        name: test-reports
         path: build/reports/
         retention-days: 7
 
   web-tests:
-    name: Run Web Tests (Optional - Manual)
+    name: Run Web Tests
     runs-on: ubuntu-latest
-    if: github.event_name == 'workflow_dispatch'  # Hanya manual trigger
+    if: github.event_name == 'workflow_dispatch'
     
     steps:
     - name: Checkout code
@@ -52,31 +52,11 @@ jobs:
     - name: Make Gradle Wrapper Executable
       run: chmod +x ./gradlew
       
-    - name: Install Chrome Dependencies
-      run: |
-        sudo apt-get update
-        sudo apt-get install -y libxss1 libappindicator3-1 libindicator3-7 fonts-liberation libasound2 libnspr4 libnss3 libx11-xcb1 libxcomposite1 libxcursor1 libxdamage1 libxi6 libxtst6 xdg-utils
+    - name: Setup Chrome
+      uses: browser-actions/setup-chrome@v1
+      with:
+        chrome-version: stable
       
-    - name: Install Chrome
-      run: |
-        wget -q -O - https://dl.google.com/linux/linux_signing_key.pub | sudo apt-key add -
-        echo "deb [arch=amd64] http://dl.google.com/linux/chrome/deb/ stable main" | sudo tee /etc/apt/sources.list.d/google-chrome.list
-        sudo apt-get update
-        sudo apt-get install -y google-chrome-stable
-      
-    - name: Verify Chrome Installation
-      run: |
-        google-chrome-stable --version
-        which google-chrome-stable
-      
-    - name: Run Web Tests with Headless Chrome
+    - name: Run Web Tests
       run: |
         ./gradlew testWeb -Dwebdriver.headless=true --no-daemon --stacktrace
-      
-    - name: Upload Web Test Reports
-      uses: actions/upload-artifact@v4
-      if: always()
-      with:
-        name: web-test-reports
-        path: build/reports/
-        retention-days: 7
